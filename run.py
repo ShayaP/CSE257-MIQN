@@ -46,6 +46,7 @@ def run(frames=1000, eps_fixed=False, eps_frames=1e6, min_eps=0.01, eval_every=1
     scores = []                        # list containing scores from each episode
     scores_window = deque(maxlen=100)  # last 100 scores
     frame = 0
+    score_per_ep = []
     if eps_fixed:
         eps = 0
     else:
@@ -77,13 +78,15 @@ def run(frames=1000, eps_fixed=False, eps_frames=1e6, min_eps=0.01, eval_every=1
             scores_window.append(score)       # save most recent score
             scores.append(score)              # save most recent score
             writer.add_scalar("Average100", np.mean(scores_window), frame*worker)
+            score_per_ep.append(np.mean(scores_window))
             print('\rEpisode {}\tFrame {} \tAverage100 Score: {:.2f}'.format(i_episode*worker, frame*worker, np.mean(scores_window)), end="")
             if i_episode % 100 == 0:
                 print('\rEpisode {}\tFrame {}\tAverage100 Score: {:.2f}'.format(i_episode*worker, frame*worker, np.mean(scores_window)))
             i_episode +=1 
             state = envs.reset()
-            score = 0              
-
+            score = 0             
+         
+    return score_per_ep
 
 
 
@@ -174,9 +177,15 @@ if __name__ == "__main__":
         eps_fixed = False
 
     t0 = time.time()
-    run(frames = args.frames//args.worker, eps_fixed=eps_fixed, eps_frames=args.eps_frames//args.worker, min_eps=args.min_eps, eval_every=args.eval_every//args.worker, eval_runs=args.eval_runs, worker=args.worker)
+    scores = run(frames = args.frames//args.worker, eps_fixed=eps_fixed, eps_frames=args.eps_frames//args.worker, min_eps=args.min_eps, eval_every=args.eval_every//args.worker, eval_runs=args.eval_runs, worker=args.worker)
     t1 = time.time()
     
     print("Training time: {}min".format(round((t1-t0)/60,2)))
     if args.save_model:
         torch.save(agent.qnetwork_local.state_dict(), args.info+".pth")
+        
+        # Save the runs so we can graph later.
+        print("Found ", len(scores), " scores.")
+        with open(args.info+".scores", 'w') as f:
+            for score in scores:
+                f.write(str(score)+"\n")
